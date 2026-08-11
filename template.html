@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>纳斯达克100打分系统 | Nasdaq-100 Investment Scoring System</title>
+<!-- __ECHARTS_CDN__ -->
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --text-soft: #9ca3af;
+    --primary: #3b82f6;
+    --primary-light: #93c5fd;
+    --primary-bg: #eff6ff;
+    --grade-a: #16a34a;
+    --grade-b: #65a30d;
+    --grade-c: #ca8a04;
+    --grade-d: #ea580c;
+    --grade-e: #dc2626;
+    --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    font-size: 14px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
+  header { margin-bottom: 28px; }
+  header h1 {
+    font-size: 28px; font-weight: 700; color: var(--text); margin-bottom: 4px;
+  }
+  header .subtitle {
+    font-size: 13px; color: var(--text-muted); margin-bottom: 14px;
+  }
+  header .meta {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px; padding-top: 14px;
+    border-top: 1px solid var(--border);
+    font-size: 13px; color: var(--text-muted);
+  }
+  .meta-source { font-weight: 500; color: var(--text); }
+  .meta-source span.muted { color: var(--text-muted); font-weight: 400; }
+  .meta-date {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .meta-date select {
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px;
+    font-size: 13px; background: white; color: var(--text); cursor: pointer;
+  }
+  .meta-date .ts { color: var(--text-soft); font-size: 12px; }
+
+  .cards {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(4, 1fr);
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .card .label {
+    font-size: 13px; color: var(--text-muted); margin-bottom: 12px;
+  }
+  .card .value {
+    font-size: 32px; font-weight: 700; color: var(--text);
+    margin-bottom: 6px; line-height: 1.1;
+  }
+  .card .value .sign { font-size: 22px; font-weight: 600; }
+  .card .meta-info {
+    font-size: 12px; color: var(--text-soft);
+  }
+  .card .meta-info .blue { color: var(--primary); font-weight: 500; }
+
+  .card-grade { display: flex; flex-direction: column; }
+  .grade-letter {
+    font-size: 56px; font-weight: 800; color: white;
+    line-height: 1; margin-bottom: 6px;
+  }
+  .grade-score {
+    font-size: 16px; font-weight: 600; color: white;
+    margin-bottom: 6px;
+  }
+  .grade-label {
+    font-size: 12px; color: rgba(255,255,255,0.9);
+  }
+  .grade-A { background: linear-gradient(135deg, #16a34a, #15803d); }
+  .grade-B { background: linear-gradient(135deg, #65a30d, #4d7c0f); }
+  .grade-C { background: linear-gradient(135deg, #f59e0b, #d97706); }
+  .grade-D { background: linear-gradient(135deg, #f97316, #ea580c); }
+  .grade-E { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+
+  .section {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 22px 24px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .section-title {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 16px; font-weight: 600; color: var(--text);
+    margin-bottom: 18px;
+  }
+  .section-title::before {
+    content: ''; width: 3px; height: 14px;
+    background: var(--primary); border-radius: 2px;
+  }
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 32px;
+    align-items: center;
+  }
+  #radar-chart { width: 100%; height: 240px; }
+  .bars { display: flex; flex-direction: column; gap: 14px; }
+  .bar-row .bar-label {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px; font-size: 13px; color: var(--text-muted);
+  }
+  .bar-row .bar-label .name { font-weight: 500; color: var(--text); }
+  .bar-row .bar-label .val { font-weight: 600; color: var(--text); }
+  .bar-track {
+    height: 10px; background: #f1f5f9; border-radius: 5px; overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #6366f1, #8b5cf6);
+    border-radius: 5px;
+    transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .bar-total .bar-fill {
+    background: linear-gradient(90deg, #06b6d4, #3b82f6);
+  }
+
+  .table-wrap { overflow-x: auto; }
+  table.history {
+    width: 100%; border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.history th, table.history td {
+    padding: 10px 12px; text-align: right;
+    border-bottom: 1px solid #f0f2f5;
+  }
+  table.history th {
+    background: #f8fafc; color: var(--text-muted);
+    font-weight: 600; font-size: 12px;
+    text-transform: none;
+    white-space: nowrap;
+  }
+  table.history th:first-child, table.history td:first-child {
+    text-align: left;
+  }
+  table.history tbody tr:hover { background: #fafbfc; }
+  table.history tbody tr.total-row {
+    background: #eff6ff;
+    font-weight: 600;
+  }
+  table.history tbody tr.total-row td {
+    color: var(--text);
+  }
+  .grade-pill {
+    display: inline-block; min-width: 24px; padding: 2px 8px;
+    border-radius: 4px; font-size: 12px; font-weight: 700;
+    color: white; text-align: center;
+  }
+  .grade-pill.A { background: var(--grade-a); }
+  .grade-pill.B { background: var(--grade-b); }
+  .grade-pill.C { background: var(--grade-c); }
+  .grade-pill.D { background: var(--grade-d); }
+  .grade-pill.E { background: var(--grade-e); }
+
+  .up { color: #ef4444; font-weight: 500; }
+  .down { color: #16a34a; font-weight: 500; }
+  .flashing { animation: flash 0.5s ease-out; }
+  @keyframes flash {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  footer {
+    margin-top: 30px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--text-soft);
+    text-align: center;
+  }
+  footer code {
+    background: #f1f5f9; padding: 1px 6px; border-radius: 3px;
+    font-family: "SF Mono", Consolas, Monaco, monospace;
+    font-size: 11px;
+  }
+
+  @media (max-width: 900px) {
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .detail-grid { grid-template-columns: 1fr; gap: 18px; }
+    #radar-chart { height: 320px; }
+  }
+  @media (max-width: 540px) {
+    .cards { grid-template-columns: 1fr; }
+    .card .value { font-size: 26px; }
+    .grade-letter { font-size: 44px; }
+  }
+
+  /* refresh button */
+  .refresh-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
+    background: white; color: var(--text); cursor: pointer;
+    font-size: 13px; font-weight: 500;
+    transition: all 0.15s ease;
+  }
+  .refresh-btn:hover:not(:disabled) {
+    background: var(--primary-bg); border-color: var(--primary); color: var(--primary);
+  }
+  .refresh-btn:disabled { cursor: not-allowed; opacity: 0.7; }
+  .refresh-btn.refreshing .refresh-icon { animation: spin-icon 0.8s linear infinite; }
+  .refresh-btn.success { background: #16a34a; color: white; border-color: #16a34a; }
+  .refresh-btn.error { background: #dc2626; color: white; border-color: #dc2626; }
+  .refresh-icon { display: inline-block; font-size: 14px; line-height: 1; }
+  @keyframes spin-icon { to { transform: rotate(360deg); } }
+
+  /* data age badge */
+  .age-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 12px;
+    background: #f0fdf4; color: #15803d;
+    font-size: 11px; font-weight: 500;
+    white-space: nowrap;
+  }
+  .age-badge.stale { background: #fef2f2; color: #b91c1c; }
+  .age-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .age-badge .sep { opacity: 0.4; margin: 0 2px; }
+  .age-badge .refreshed { opacity: 0.7; font-weight: 400; }
+  .age-badge .stale-hint { opacity: 0.7; margin-left: 2px; }
+
+  /* boot overlay */
+  #boot-overlay {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 9999; transition: opacity 0.4s ease;
+    font-size: 14px; color: var(--text-muted);
+  }
+  #boot-overlay.hidden { opacity: 0; pointer-events: none; }
+  #boot-overlay .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid #e5e7eb;
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #boot-overlay .err {
+    color: #dc2626; font-weight: 600; margin-top: 10px;
+    max-width: 80%; text-align: center; line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<div id="boot-overlay">
+  <div class="spinner"></div>
+  <div>正在加载数据 &hellip;</div>
+  <div class="err" id="boot-error" style="display:none"></div>
+</div>
+<div class="container">
+  <header>
+    <h1>纳斯达克100打分系统</h1>
+    <div class="subtitle">Nasdaq-100 Investment Scoring System</div>
+    <div class="meta">
+      <div class="meta-source">
+        数据：<span>腾讯证券</span> <span class="muted">/</span> <span>Yahoo Finance</span>
+        <span class="muted">(SOCKS5)</span>
+      </div>
+      <div class="meta-date">
+        <span>查询日期</span>
+        <select id="date-selector"></select>
+        <button id="refresh-btn" class="refresh-btn" type="button" aria-label="刷新数据">
+          <span class="refresh-icon">&#x21bb;</span>
+          <span class="refresh-label">刷新数据</span>
+        </button>
+        <span class="ts" id="ts"></span>
+      </div>
+    </div>
+  </header>
+
+  <section class="cards">
+    <div class="card">
+      <div class="label">PE十年百分位</div>
+      <div class="value" id="val-pe-pct">--</div>
+      <div class="meta-info">PE: <span class="blue" id="val-pe">--</span> &rarr; <span id="val-pe-score">--</span> / 30</div>
+    </div>
+    <div class="card">
+      <div class="label">价格 VS MA200</div>
+      <div class="value" id="val-dev">--</div>
+      <div class="meta-info">均线: <span class="blue" id="val-ma">--</span> &rarr; <span id="val-ma-score">--</span> / 40</div>
+    </div>
+    <div class="card">
+      <div class="label">VIX恐慌指数</div>
+      <div class="value" id="val-vix">--</div>
+      <div class="meta-info">阈值 14 &rarr; <span id="val-vix-score">--</span> / 30</div>
+    </div>
+    <div class="card card-grade" id="grade-card">
+      <div class="grade-letter" id="grade-letter">--</div>
+      <div class="grade-score" id="grade-score">-- / 100</div>
+      <div class="grade-label" id="grade-label">--</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-title">当前评分详情</div>
+    <div class="detail-grid">
+      <div id="radar-chart"></div>
+      <div class="bars">
+        <div class="bar-row">
+          <div class="bar-label"><span class="name">PE十年百分位 (满分30)</span><span class="val" id="bar-pe">-- / 30</span></div>
+          <div class="bar-track"><div class="bar-fill" id="fill-pe" style="width:0%"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label"><span class="name">MA200偏离度 (满分40)</span><span class="val" id="bar-ma">-- / 40</span></div>
+          <div class="bar-track"><div class="bar-fill" id="fill-ma" style="width:0%"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label"><span class="name">VIX恐慌指数 (满分30)</span><span class="val" id="bar-vix">-- / 30</span></div>
+          <div class="bar-track"><div class="bar-fill" id="fill-vix" style="width:0%"></div></div>
+        </div>
+        <div class="bar-row bar-total">
+          <div class="bar-label"><span class="name">综合评分 (满分100)</span><span class="val" id="bar-total">-- / 100</span></div>
+          <div class="bar-track"><div class="bar-fill" id="fill-total" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-title">历史评分记录（最近一年）</div>
+    <div class="table-wrap">
+      <table class="history" id="history-table">
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th>NDX价格</th>
+            <th>PE</th>
+            <th>PE百分位</th>
+            <th>MA200</th>
+            <th>偏离度</th>
+            <th>VIX</th>
+            <th>PE得分</th>
+            <th>MA得分</th>
+            <th>VIX得分</th>
+            <th>综合</th>
+            <th>等级</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:14px; font-size:12px; color:var(--text-soft)">
+      口径：PE = 30&times;(1−percentile/100)、MA = f(dev, non-linear, ≥12% → 0)、VIX = max(0, (vix−14)&times;1.7)。综合≥80=A / ≥60=B / ≥40=C / ≥20=D / &lt;20=E。
+    </div>
+  </section>
+
+  <footer>
+    Generated by <code>fetch_data.py</code>. Self-contained — open <code>index.html</code> directly. Data updates: rerun the script.
+  </footer>
+</div>
+
+<script>
+/* __DATA_INJECTION__ */
+</script>
+<script>
+(function () {
+  'use strict';
+
+  // Global error trap so a bug never leaves the user staring at a blank page
+  function showBootError(msg) {
+    const overlay = document.getElementById('boot-overlay');
+    if (!overlay) return;
+    const err = document.getElementById('boot-error');
+    if (err) { err.style.display = 'block'; err.textContent = msg; }
+  }
+  window.addEventListener('error', (e) => {
+    console.error(e);
+    showBootError('脚本错误: ' + (e.message || 'unknown') + '\n请按 F12 查看控制台详情');
+  });
+
+  const DATA = window.NDX_DATA || { records: [], latest: null };
+  if (!DATA.records.length) {
+    showBootError('没有加载到数据。请确认 fetch_data.py 跑成功且 index.html 含 window.NDX_DATA。');
+    return;
+  }
+
+  // -------------------------- helpers --------------------------
+  const fmt = (v, d = 2) => (v == null || isNaN(v)) ? '--' : Number(v).toFixed(d);
+  const fmtPct = (v, d = 1) => (v == null || isNaN(v)) ? '--' : Number(v).toFixed(d) + '%';
+  const fmtSign = (v, d = 2) => {
+    if (v == null || isNaN(v)) return '--';
+    const s = Number(v).toFixed(d);
+    return (v >= 0 ? '+' : '') + s + '%';
+  };
+  const gradeLabelMap = {
+    A: '极度低估，加大买入',
+    B: '低估，可分批加仓',
+    C: '合理估值，正常持有',
+    D: '偏高，正常定投',
+    E: '严重高估，减仓观望',
+  };
+
+  // -------------------------- state --------------------------
+  const state = {
+    records: DATA.records.slice().sort((a, b) => a.date.localeCompare(b.date)),
+    latest:  DATA.latest || DATA.records[DATA.records.length - 1],
+    selected: null,
+  };
+
+  // -------------------------- date selector --------------------------
+  function initDateSelector() {
+    const sel = document.getElementById('date-selector');
+    // Build list of last ~365 days descending, plus latest
+    const all = state.records;
+    const today = new Date();
+    const cutoff = new Date(today);
+    cutoff.setDate(cutoff.getDate() - 365);
+
+    // Discrete trading-day options (~ monthly) for browsing snapshots
+    const samples = [];
+    let lastMonthKey = '';
+    for (let i = all.length - 1; i >= 0; i--) {
+      const r = all[i];
+      const d = new Date(r.date);
+      if (d < cutoff) break;
+      const mk = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      if (mk !== lastMonthKey) {
+        samples.push(r);
+        lastMonthKey = mk;
+      }
+    }
+    samples.reverse();
+
+    sel.innerHTML = '';
+    samples.forEach((r) => {
+      const opt = document.createElement('option');
+      opt.value = r.date;
+      opt.textContent = r.date;
+      sel.appendChild(opt);
+    });
+
+    // Also keep "latest" option pinned
+    const latestOpt = document.createElement('option');
+    latestOpt.value = state.latest.date;
+    latestOpt.textContent = state.latest.date + ' (今日)';
+    sel.insertBefore(latestOpt, sel.firstChild);
+    sel.value = state.latest.date;
+
+    sel.addEventListener('change', (e) => {
+      const date = e.target.value;
+      const rec = state.records.find((r) => r.date === date);
+      if (rec) renderSnapshot(rec);
+    });
+  }
+
+  // -------------------------- render --------------------------
+  function renderSnapshot(rec) {
+    state.selected = rec;
+
+    // Top cards
+    document.getElementById('val-pe-pct').textContent = fmtPct(rec.pe_pct);
+    document.getElementById('val-pe').textContent     = fmt(rec.pe);
+    document.getElementById('val-pe-score').textContent = fmt(rec.pe_score, 1);
+
+    document.getElementById('val-dev').textContent = fmtSign(rec.dev_pct);
+    document.getElementById('val-ma').textContent  = fmt(rec.ma200);
+    document.getElementById('val-ma-score').textContent = fmt(rec.ma_score, 1);
+
+    document.getElementById('val-vix').textContent = fmt(rec.vix, 1);
+    document.getElementById('val-vix-score').textContent = fmt(rec.vix_score, 1);
+
+    // Grade card
+    const gcard = document.getElementById('grade-card');
+    gcard.className = 'card card-grade grade-' + rec.grade;
+    const gl = document.getElementById('grade-letter');
+    gl.textContent = rec.grade;
+    gl.classList.remove('flashing'); void gl.offsetWidth; gl.classList.add('flashing');
+
+    document.getElementById('grade-score').textContent = fmt(rec.total, 1) + ' / 100';
+    document.getElementById('grade-label').textContent = gradeLabelMap[rec.grade] || '--';
+
+    // Progress bars
+    setBar('pe',    rec.pe_score,    30);
+    setBar('ma',    rec.ma_score,    40);
+    setBar('vix',   rec.vix_score,   30);
+    setBar('total', rec.total,      100);
+
+    // Radar chart
+    drawRadar(rec);
+
+    // Timestamp (single source of truth — used by both manual click and auto-refresh)
+    updateTimestampBadge();
+  }
+
+  function setBar(name, score, max) {
+    document.getElementById('bar-' + name).textContent = fmt(score, 1) + ' / ' + max;
+    const pct = Math.min(100, Math.max(0, (Number(score) / max) * 100));
+    document.getElementById('fill-' + name).style.width = pct.toFixed(1) + '%';
+  }
+
+  // -------------------------- radar --------------------------
+  let radarChart = null;
+
+  function drawRadar(rec) {
+    const el = document.getElementById('radar-chart');
+    if (!window.echarts) return;
+    if (!radarChart) radarChart = echarts.init(el);
+    radarChart.setOption({
+      tooltip: { trigger: 'item' },
+      radar: {
+        indicator: [
+          { name: 'MA200\n（偏离度小 → 高）', max: 40 },
+          { name: 'PE百分位\n（低 → 高）',     max: 30 },
+          { name: 'VIX\n（恐慌 → 高）',       max: 30 },
+        ],
+        shape: 'polygon',
+        radius: '68%',
+        splitNumber: 4,
+        axisName: { color: '#6b7280', fontSize: 11 },
+        splitLine: { lineStyle: { color: '#e5e7eb' } },
+        splitArea: {
+          areaStyle: {
+            color: ['rgba(59,130,246,0.04)', 'rgba(59,130,246,0.08)'],
+          },
+        },
+        axisLine: { lineStyle: { color: '#e5e7eb' } },
+      },
+      series: [{
+        type: 'radar',
+        data: [{
+          value: [rec.ma_score, rec.pe_score, rec.vix_score],
+          name: '当前',
+          areaStyle: { color: 'rgba(59,130,246,0.18)' },
+          lineStyle: { color: '#3b82f6', width: 2 },
+          itemStyle: { color: '#3b82f6' },
+        }],
+      }],
+    }, true);
+  }
+
+  // -------------------------- history table --------------------------
+  function renderHistory() {
+    const tbody = document.getElementById('history-tbody');
+    tbody.innerHTML = '';
+
+    const today = new Date();
+    const cutoff = new Date(today);
+    cutoff.setDate(cutoff.getDate() - 365);
+
+    const rows = state.records
+      .filter((r) => new Date(r.date) >= cutoff)
+      .reverse();
+
+    rows.forEach((r) => {
+      const tr = document.createElement('tr');
+      tr.dataset.date = r.date;
+      if (state.selected && r.date === state.selected.date) {
+        tr.classList.add('total-row');
+      }
+      tr.innerHTML = `
+        <td>${r.date}</td>
+        <td>${fmt(r.ndx)}</td>
+        <td>${fmt(r.pe)}</td>
+        <td>${fmtPct(r.pe_pct)}</td>
+        <td>${fmt(r.ma200)}</td>
+        <td class="${r.dev_pct >= 0 ? 'up' : 'down'}">${fmtSign(r.dev_pct)}</td>
+        <td>${fmt(r.vix, 1)}</td>
+        <td>${fmt(r.pe_score, 1)}</td>
+        <td>${fmt(r.ma_score, 1)}</td>
+        <td>${fmt(r.vix_score, 1)}</td>
+        <td><b>${fmt(r.total, 1)}</b></td>
+        <td><span class="grade-pill ${r.grade}">${r.grade}</span></td>
+      `;
+      tr.addEventListener('click', () => {
+        const sel = document.getElementById('date-selector');
+        const opt = Array.from(sel.options).find((o) => o.value === r.date);
+        if (opt) {
+          sel.value = r.date;
+          renderSnapshot(r);
+        } else {
+          renderSnapshot(r);
+        }
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  // -------------------------- bootstrap --------------------------
+  window.addEventListener('resize', () => { if (radarChart) radarChart.resize(); });
+
+  // -------------------------- refresh button --------------------------
+  async function refreshData() {
+    const btn = document.getElementById('refresh-btn');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.classList.remove('success', 'error');
+    btn.classList.add('refreshing');
+    btn.querySelector('.refresh-label').textContent = '刷新中…';
+
+    try {
+      const r = await fetch('/refresh', { method: 'GET', cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+
+      if (d.ok) {
+        btn.classList.remove('refreshing');
+        btn.classList.add('success');
+        btn.querySelector('.refresh-label').textContent = '✓ 已更新';
+        // Reload after a brief beat so user sees the success state
+        setTimeout(() => location.reload(), 650);
+      } else {
+        throw new Error(d.message || '刷新失败');
+      }
+    } catch (e) {
+      btn.classList.remove('refreshing');
+      btn.classList.add('error');
+      btn.querySelector('.refresh-label').textContent = '✗ 失败';
+      console.error(e);
+      // Recover after a moment
+      setTimeout(() => {
+        btn.classList.remove('error');
+        btn.querySelector('.refresh-label').textContent = '刷新数据';
+        btn.disabled = false;
+      }, 2500);
+      alert('刷新失败：' + (e.message || e) + '\n按 F12 查看控制台');
+    }
+  }
+  window.refreshData = refreshData;  // exposed for inline onclick
+
+  // -------------------------- data-age badge --------------------------
+  // Single source of truth for the time pill in the header.
+  // - dataDate:      the trading day this data represents (e.g. "2026-08-07")
+  // - refreshedAt:   when this snapshot was generated locally (e.g. "2026-08-11 09:46:48")
+  // - stale:         bool — refresh happened >24h ago or never
+  // - justNow:       bool — show "刚刚" hint (used right after a manual click)
+  function formatTimeHM(iso) {
+    // "2026-08-11T09:46:48.123456" → "09:46"
+    // seconds omitted to keep the pill short; we show date separately
+    if (!iso) return '';
+    return String(iso).slice(11, 16);
+  }
+  function formatFullDate(iso) {
+    if (!iso) return '';
+    return String(iso).slice(0, 10);
+  }
+
+  function updateTimestampBadge(opts) {
+    opts = opts || {};
+    const ts = document.getElementById('ts');
+    if (!ts) return;
+
+    // 1) dataDate: prefer caller-supplied (state.latest.date), else ndx_snapshot.json's "latest.date"
+    let dataDate = opts.dataDate || '';
+    if (!dataDate && state && state.latest) dataDate = state.latest.date;
+
+    // 2) refreshedAt: caller-supplied (e.g. "刚刚" right after click), else from /api/status fetch
+    let refreshedLabel = opts.refreshedLabel || '';
+    let refreshedISO   = opts.refreshedISO   || null;
+    let stale          = !!opts.stale;
+    let justNow        = !!opts.justNow;
+
+    if (!refreshedLabel && opts.fetchStatusFn) {
+      // async path handled by refreshAgeBadge
+    }
+
+    // Build pill
+    const cls = stale ? 'age-badge stale' : 'age-badge';
+    let refreshText;
+    if (justNow) refreshText = '刚刚';
+    else if (refreshedLabel) refreshText = refreshedLabel;
+    else if (refreshedISO) refreshText = `${formatFullDate(refreshedISO)} ${formatTimeHM(refreshedISO)}`;
+    else refreshText = null;  // suppress the refresh segment entirely if we have nothing
+
+    const staleHint = stale ? '<span class="stale-hint">（旧）</span>' : '';
+    const refreshSegment = refreshText != null
+      ? `<span class="sep">·</span><span class="refreshed">更新于 ${refreshText}${staleHint}</span>`
+      : '';
+
+    ts.innerHTML = `<span class="${cls}">` +
+      `<span class="dot"></span>` +
+      (dataDate ? `数据日期: <strong>${dataDate}</strong>` : '数据: —') +
+      refreshSegment +
+      `</span>`;
+  }
+
+  async function refreshAgeBadge() {
+    try {
+      const r = await fetch('/api/status', { cache: 'no-store' });
+      if (!r.ok) return;
+      const s = await r.json();
+
+      // Snapshot's trading-day date is what really matters to the user.
+      // Fall back to /api/snapshot if for some reason state.latest isn't loaded yet.
+      let dataDate = (state && state.latest && state.latest.date) || '';
+      if (!dataDate && s.data_generated_at) {
+        // ndx_snapshot.json's "latest.date" comes via /api/snapshot; fetch lazily
+        try {
+          const snap = await fetch('/api/snapshot', { cache: 'no-store' });
+          if (snap.ok) {
+            const sj = await snap.json();
+            dataDate = (sj.latest && sj.latest.date) || '';
+          }
+        } catch (_) {}
+      }
+
+      // Refresh time: prefer data_generated_at (when fetch_data.py wrote this snapshot),
+      // else fall back to last_refresh_at (Unix epoch).
+      let refreshedISO = s.data_generated_at || null;
+      if (!refreshedISO && s.last_refresh_at) {
+        refreshedISO = new Date(s.last_refresh_at * 1000).toISOString();
+      }
+
+      updateTimestampBadge({
+        dataDate: dataDate,
+        refreshedISO: refreshedISO,
+        stale: !!s.data_is_stale,
+      });
+    } catch (e) { /* offline; ignore */ }
+  }
+
+  function init() {
+    initDateSelector();
+    renderHistory();
+    renderSnapshot(state.latest);
+    refreshAgeBadge();
+    setInterval(refreshAgeBadge, 5 * 60 * 1000);  // re-check every 5 min
+    // Hide loader once everything is wired
+    const ov = document.getElementById('boot-overlay');
+    if (ov) requestAnimationFrame(() => {
+      ov.classList.add('hidden');
+      setTimeout(() => ov.remove(), 500);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

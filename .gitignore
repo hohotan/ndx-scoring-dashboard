@@ -1,0 +1,26 @@
+# ===== 本地运行时产物（不进仓库）=====
+# 嵌入版 Python（180MB，CI 会在 runner 上自己装）
+python/
+python-embed.zip
+get-pip.py
+
+# 日志
+*.log
+serve.*.log
+serve.watchdog.log
+ndx_crash.log
+
+# WorkBuddy 工作区状态（永远不要进 git）
+.workbuddy-ai/
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# 系统文件
+.DS_Store
+Thumbs.db
