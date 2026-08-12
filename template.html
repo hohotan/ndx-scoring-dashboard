@@ -232,6 +232,20 @@
   .refresh-icon { display: inline-block; font-size: 14px; line-height: 1; }
   @keyframes spin-icon { to { transform: rotate(360deg); } }
 
+  /* toast (used on static/Public hosting where the refresh button can't hit a backend) */
+  .toast {
+    position: fixed; left: 50%; bottom: 28px;
+    transform: translateX(-50%) translateY(20px);
+    max-width: 540px; background: #1f2937; color: #f9fafb;
+    padding: 12px 16px; border-radius: 10px; font-size: 13px; line-height: 1.6;
+    box-shadow: 0 8px 24px rgba(0,0,0,.28);
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease; z-index: 9999;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  .toast a { color: #93c5fd; text-decoration: underline; }
+  .toast code { background: rgba(255,255,255,.12); padding: 1px 5px; border-radius: 4px; }
+
   /* data age badge */
   .age-badge {
     display: inline-flex; align-items: center; gap: 5px;
@@ -607,9 +621,65 @@
   window.addEventListener('resize', () => { if (radarChart) radarChart.resize(); });
 
   // -------------------------- refresh button --------------------------
+  // Whether a live backend (serve.py) is reachable. null = unknown (still probing).
+  // On static hosts (GitHub Pages etc.) this stays false and the button instead
+  // tells the user to trigger the GitHub Action manually.
+  let HAS_BACKEND = null;
+  let ACTIONS_URL = '';
+
+  // Best-effort link to the Actions tab for github.io deployments.
+  function buildActionsUrl() {
+    const m = String(location.hostname).match(/^([^.]+)\.github\.io$/);
+    if (!m) return '';
+    const user = m[1];
+    const repo = (location.pathname.split('/').filter(Boolean)[0]) || '';
+    return `https://github.com/${user}/${repo}/actions`;
+  }
+
+  // On static hosting, retitle the button so it doesn't pretend to do a live refresh.
+  function relabelStaticButton() {
+    const btn = document.getElementById('refresh-btn');
+    if (!btn || btn.dataset.staticMode) return;
+    btn.dataset.staticMode = '1';
+    btn.title = '静态托管版：数据每天 09:00（北京时间）自动更新；如需立即更新，请去 GitHub Actions 手动触发';
+    const lbl = btn.querySelector('.refresh-label');
+    if (lbl) lbl.textContent = '每日自动更新';
+  }
+
+  function showToast(html, ms) {
+    let t = document.getElementById('toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'toast';
+      t.className = 'toast';
+      document.body.appendChild(t);
+    }
+    t.innerHTML = html;
+    // force reflow so the transition runs even on repeated calls
+    void t.offsetWidth;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), ms || 7000);
+  }
+
   async function refreshData() {
     const btn = document.getElementById('refresh-btn');
     if (!btn || btn.disabled) return;
+
+    // Static hosting (or backend not yet probed): no backend to talk to — point the
+    // user to the manual Actions trigger instead of blindly hitting /refresh.
+    if (HAS_BACKEND !== true) {
+      const url = ACTIONS_URL;
+      const link = url
+        ? `请前往仓库的 <a href="${url}" target="_blank" rel="noopener">Actions 标签页</a> 手动触发 <code>Refresh NDX data</code> 工作流。`
+        : `请前往仓库的 Actions 标签页手动触发 <code>Refresh NDX data</code> 工作流。`;
+      showToast(
+        `当前为静态托管版本，无法在线刷新。数据每天 09:00（北京时间）自动更新；如需立即更新，${link}`,
+        9000
+      );
+      return;
+    }
+
     btn.disabled = true;
     btn.classList.remove('success', 'error');
     btn.classList.add('refreshing');
@@ -702,9 +772,11 @@
   }
 
   async function refreshAgeBadge() {
+    let backendOk = false;
     try {
       const r = await fetch('/api/status', { cache: 'no-store' });
-      if (!r.ok) return;
+      backendOk = r.ok;
+      if (!r.ok) { HAS_BACKEND = false; relabelStaticButton(); return; }
       const s = await r.json();
 
       // Snapshot's trading-day date is what really matters to the user.
@@ -733,7 +805,13 @@
         refreshedISO: refreshedISO,
         stale: !!s.data_is_stale,
       });
-    } catch (e) { /* offline; ignore */ }
+      HAS_BACKEND = true;
+    } catch (e) {
+      // No backend reachable (static hosting) — switch button to "hint" mode.
+      HAS_BACKEND = false;
+      ACTIONS_URL = buildActionsUrl();
+      relabelStaticButton();
+    }
   }
 
   function init() {
