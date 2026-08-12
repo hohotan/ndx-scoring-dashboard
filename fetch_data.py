@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import sys
 import html
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict
 
@@ -33,8 +33,16 @@ import yfinance as yf
 # 1. Data Fetching
 # ============================================================================
 
-def fetch_market_data(start: str = "2016-01-01", end: str = "2026-08-08") -> pd.DataFrame:
-    """Fetch NDX close + VIX close for the given window."""
+def fetch_market_data(start: str = "2016-01-01", end: str = None) -> pd.DataFrame:
+    """Fetch NDX close + VIX close for the given window.
+
+    `end` defaults to ~5 days ahead of today so the most recent trading
+    session is always included (yfinance's `end` is exclusive of the last
+    day). Previously this was hardcoded to 2026-08-08, which froze the data
+    date at 2026-08-07 regardless of when the job ran.
+    """
+    if end is None:
+        end = (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d")
     print(f"Fetching NDX (^NDX) and VIX (^VIX) from {start} to {end}...")
 
     # Auto-adjust end to today if needed

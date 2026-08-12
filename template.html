@@ -474,7 +474,8 @@
     // Also keep "latest" option pinned
     const latestOpt = document.createElement('option');
     latestOpt.value = state.latest.date;
-    latestOpt.textContent = state.latest.date + ' (今日)';
+    const _today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' });
+    latestOpt.textContent = state.latest.date + (state.latest.date === _today ? ' (今日)' : '');
     sel.insertBefore(latestOpt, sel.firstChild);
     sel.value = state.latest.date;
 
