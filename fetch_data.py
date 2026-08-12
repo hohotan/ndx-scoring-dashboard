@@ -1,13 +1,14 @@
 """
 Nasdaq-100 Investment Scoring System - Data Fetcher & Scoring Engine
 =====================================================================
-Pulls 10 years of NDX (^NDX) and VIX (^VIX) daily data from Yahoo Finance,
-computes MA200, 10-year valuation percentile, deviation, and applies the
+Pulls ~20 years of NDX (^NDX) and VIX (^VIX) daily data from Yahoo Finance,
+computes MA200, 5-year valuation percentile, deviation, and applies the
 3-dimension scoring model (PE / MA200 / VIX) to produce a 0-100 composite
-score with letter grade.
+score with letter grade. Early rows where indicators lack lookback history are
+kept (price/VIX/PE only) so the long-run trend chart spans the full window.
 
 Outputs:
-    ndx_history.json  - Full 10y daily series with scores
+    ndx_history.json  - Full ~20y daily series with scores
     ndx_snapshot.json - Latest snapshot only
     index.html        - Self-contained dashboard (data inlined from template.html)
 
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 import json
 import sys
+import math
 import html
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -33,16 +35,17 @@ import yfinance as yf
 # 1. Data Fetching
 # ============================================================================
 
-def fetch_market_data(start: str = "2016-01-01", end: str = None) -> pd.DataFrame:
+def fetch_market_data(start: str = None, end: str = None) -> pd.DataFrame:
     """Fetch NDX close + VIX close for the given window.
 
-    `end` defaults to ~5 days ahead of today so the most recent trading
-    session is always included (yfinance's `end` is exclusive of the last
-    day). Previously this was hardcoded to 2026-08-08, which froze the data
-    date at 2026-08-07 regardless of when the job ran.
+    Both bounds default dynamically: `end` is ~5 days ahead of today (so the
+    latest session is included — yfinance's `end` is exclusive), and `start`
+    is ~20 years back so the long-run trend chart spans two decades of history.
     """
     if end is None:
         end = (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d")
+    if start is None:
+        start = (datetime.now() - timedelta(days=20 * 365)).strftime("%Y-%m-%d")
     print(f"Fetching NDX (^NDX) and VIX (^VIX) from {start} to {end}...")
 
     # Auto-adjust end to today if needed
@@ -106,7 +109,9 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # Smooth VIX (some days have nulls in yfinance)
     out["vix"] = out["vix"].ffill().bfill()
 
-    out = out.dropna(subset=["ma200", "val_pct"])
+    # NOTE: do not drop rows missing ma200/val_pct. The long-run trend chart
+    # needs the full ~20y price history even where scoring indicators aren't
+    # computable yet (they ramp in after their lookback windows).
     return out
 
 
@@ -222,13 +227,26 @@ def _download_echarts(out_path: Path) -> None:
 
 
 def apply_scoring(df: pd.DataFrame) -> pd.DataFrame:
-    """Vectorised scoring across the whole frame."""
+    """Vectorised scoring across the whole frame.
+
+    Components that depend on a lookback window — PE needs the 5y valuation
+    percentile, MA needs the 200-day average — are left as None until enough
+    history exists, so the composite score only appears where it is fully
+    meaningful. VIX scoring is available across the whole history.
+    """
     out = df.copy()
-    out["pe_score"] = out["pe_pct"].apply(score_pe).round(1)
-    out["ma_score"] = out["dev_pct"].apply(score_ma).round(1)
-    out["vix_score"] = out["vix"].apply(score_vix).round(1)
-    out["total"] = (out["pe_score"] + out["ma_score"] + out["vix_score"]).round(1)
-    out["grade"] = out["total"].apply(total_grade)
+    out["pe_score"] = out["pe_pct"].apply(lambda v: None if pd.isna(v) else round(score_pe(v), 1))
+    out["ma_score"] = out["dev_pct"].apply(lambda v: None if pd.isna(v) else round(score_ma(v), 1))
+    out["vix_score"] = out["vix"].apply(lambda v: None if pd.isna(v) else round(score_vix(v), 1))
+
+    def _total(row):
+        ps, ms, vs = row["pe_score"], row["ma_score"], row["vix_score"]
+        if pd.isna(ps) or pd.isna(ms) or pd.isna(vs):
+            return None
+        return round(float(ps) + float(ms) + float(vs), 1)
+
+    out["total"] = out.apply(_total, axis=1)
+    out["grade"] = out["total"].apply(lambda t: None if pd.isna(t) else total_grade(t))
     return out
 
 
@@ -236,23 +254,42 @@ def apply_scoring(df: pd.DataFrame) -> pd.DataFrame:
 # 4. JSON Serialisation
 # ============================================================================
 
+def _num(v, d=1):
+    """Return a rounded float, or None for NaN/None so the emitted JSON stays valid."""
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(f):
+        return None
+    return round(f, d)
+
+
 def to_records(df: pd.DataFrame) -> List[Dict]:
-    """Convert DataFrame to a list of dicts with stringified dates."""
+    """Convert DataFrame to a list of dicts with stringified dates.
+
+    Numeric fields are None where the underlying indicator isn't computable
+    yet (early history); this keeps the emitted JSON valid (no NaN literals).
+    """
     out = []
     for idx, row in df.iterrows():
+        g = row.get("grade")
+        grade_val = None if g is None or (isinstance(g, float) and math.isnan(g)) else str(g)
         out.append({
             "date": idx.strftime("%Y-%m-%d"),
-            "ndx": round(float(row["ndx"]), 2),
-            "pe": round(float(row["pe"]), 2),
-            "pe_pct": round(float(row["pe_pct"]), 1),
-            "ma200": round(float(row["ma200"]), 2),
-            "dev_pct": round(float(row["dev_pct"]), 2),
-            "vix": round(float(row["vix"]), 2),
-            "pe_score": round(float(row["pe_score"]), 1),
-            "ma_score": round(float(row["ma_score"]), 1),
-            "vix_score": round(float(row["vix_score"]), 1),
-            "total": round(float(row["total"]), 1),
-            "grade": str(row["grade"]),
+            "ndx": _num(row["ndx"], 2),
+            "pe": _num(row["pe"], 2),
+            "pe_pct": _num(row["pe_pct"], 1),
+            "ma200": _num(row["ma200"], 2),
+            "dev_pct": _num(row["dev_pct"], 2),
+            "vix": _num(row["vix"], 2),
+            "pe_score": _num(row["pe_score"], 1),
+            "ma_score": _num(row["ma_score"], 1),
+            "vix_score": _num(row["vix_score"], 1),
+            "total": _num(row["total"], 1),
+            "grade": grade_val,
         })
     return out
 
