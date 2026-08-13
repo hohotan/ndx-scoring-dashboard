@@ -1,17 +1,17 @@
 {
-  "generated_at": "2026-08-13T03:14:56.114525",
+  "generated_at": "2026-08-13T03:23:39.401493",
   "latest": {
     "date": "2026-08-12",
     "ndx": 29742.6,
     "pe": 33.35,
     "pe_pct": 98.7,
-    "ma200": 26693.42,
-    "dev_pct": 11.42,
+    "ma200": 26636.8,
+    "dev_pct": 11.66,
     "vix": 14.55,
     "pe_score": 0.4,
-    "ma_score": 4.7,
+    "ma_score": 4.2,
     "vix_score": 0.9,
-    "total": 6.0,
+    "total": 5.5,
     "grade": "E"
   }
 }
