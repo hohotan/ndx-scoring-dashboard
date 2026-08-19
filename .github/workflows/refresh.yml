@@ -1,17 +1,20 @@
 name: Refresh NDX data
 
+# NOTE: The dashboard data source is now Wind (万得), which requires a local Wind
+# terminal and cannot run in GitHub Actions CI. This workflow therefore:
+#   - does NOT auto-run on push or on a daily cron (that would regenerate with the
+#     legacy yfinance pipeline and overwrite the Wind-sourced data);
+#   - only runs on manual `workflow_dispatch`. Even then it calls build_wind_data.py,
+#     which no-ops in CI (no Wind source files) so it never clobbers the deployed data.
+# To refresh the live site, run build_wind_data.py locally (with the Wind terminal up)
+# and push the generated files.
+
 on:
-  # 首次 push 或手动 push 到 main 时立即跑一次（自动拉取 echarts + 生成 index.html）
-  push:
-    branches: [main]
-  schedule:
-    # 09:00 北京时间 = 01:00 UTC，每日自动刷新
-    - cron: '0 1 * * *'
-  # 允许在 Actions 页面手动触发
+  # 允许在 Actions 页面手动触发（CI 下为 no-op，不会覆盖 Wind 数据）
   workflow_dispatch:
 
 permissions:
-  contents: write   # 需要写回 index.html / ndx_*.json / echarts.min.js
+  contents: write   # 仅手动触发时可能写回 index.html / ndx_*.json
 
 concurrency:
   group: ndx-refresh
@@ -35,10 +38,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install yfinance pandas numpy
+          pip install pandas numpy
 
-      - name: Fetch & score data
-        run: python fetch_data.py
+      - name: Build from Wind data (no-op in CI without Wind source files)
+        run: python build_wind_data.py
 
       - name: Commit & push if changed
         run: |
@@ -46,8 +49,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add index.html ndx_history.json ndx_snapshot.json echarts.min.js
           if git diff --staged --quiet; then
-            echo "No data change, skip commit"
+            echo "No data change (Wind source files absent in CI), skip commit"
           else
-            git commit -m "chore: daily NDX score refresh [skip ci]"
+            git commit -m "chore: NDX score refresh via Wind [skip ci]"
             git push
           fi
