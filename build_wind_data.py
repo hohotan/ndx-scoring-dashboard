@@ -24,18 +24,21 @@ import pandas as pd
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent
-WIND_DIR = Path("C:/Users/Tanchuan/.workbuddy-ai/projects/c-Users-Tanchuan-workbuddy-ai-AI NDX/24187bfd-ebd5-4d18-8cc4-8ff8408a1188/tool-results")
-NDX_FILE = WIND_DIR / "mcp-connector-proxy-wind-finance_get_index_kline-1787131653804-c69242.txt"
-VIX_FILE = WIND_DIR / "mcp-connector-proxy-wind-finance_get_index_kline-1787131653222-b19682.txt"
-PE_FILE  = WIND_DIR / "mcp-connector-proxy-wind-finance_natural_language_get_edb_data-1787131817714-29ee5c.txt"
+# Stable cache populated from the Wind connector output. The connector writes timestamped
+# files into its own tool-results dir; the refresh automation copies the latest fetches
+# here under fixed names so build_wind_data.py never depends on those timestamps.
+CACHE = ROOT / "wind_cache"
+NDX_FILE = CACHE / "ndx_kline.txt"
+VIX_FILE = CACHE / "vix_kline.txt"
+PE_FILE  = CACHE / "pe_edb.txt"
 
-# Guard: this script needs Wind-sourced data files produced by the Wind MCP connector.
+# Guard: this script needs Wind-sourced data files produced by the Wind connector.
 # In CI (GitHub Actions) those files are absent, so we no-op instead of clobbering the
 # Wind-generated dashboard. The dashboard is regenerated locally (with the Wind terminal)
 # and pushed; the cron auto-refresh has been disabled for this reason.
-if not WIND_DIR.exists():
-    print("Wind source directory not found at:", WIND_DIR)
-    print("Skipping regeneration (CI without Wind terminal). No files were changed.")
+if not CACHE.exists():
+    print("wind_cache directory not found at:", CACHE)
+    print("Skipping regeneration (no Wind data cached). No files were changed.")
     sys.exit(0)
 
 def ymd(s: str) -> str:
