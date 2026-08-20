@@ -88,9 +88,22 @@ print(f"loaded: NDX={len(ndx)} VIX={len(vix)} PE={len(pe)}")
 print("NDX range:", min(ndx), max(ndx))
 print("PE  range:", min(pe), max(pe))
 
-# Align on NDX dates that have all three
-dates = sorted(set(ndx) & set(vix) & set(pe))
+# Align on NDX ∩ PE (these two we want current). Wind's VIX.GI feed lags ~1 trading
+# day behind NDX/PE, so instead of dropping the freshest day just because VIX hasn't
+# settled yet, forward-fill the most recent available VIX onto any trailing NDX/PE
+# dates that lack it. The dashboard's latest point then reflects the newest NDX price + PE.
+vix_ff = {}
+last_v = None
+for _d in sorted(set(ndx) | set(vix) | set(pe)):
+    if _d in vix:
+        last_v = vix[_d]
+    if last_v is not None:
+        vix_ff[_d] = last_v
+ndx_pe_dates = sorted(set(ndx) & set(pe))
+dates = [_d for _d in ndx_pe_dates if _d in vix_ff]
 print("aligned common dates:", len(dates), dates[0], dates[-1])
+_ff = [_d for _d in ndx_pe_dates if _d not in vix and _d in vix_ff]
+print("VIX forward-filled onto trailing dates:", _ff if _ff else "none")
 
 # Build price/pe/vix frames for rolling calcs
 s_ndx = pd.Series({d: ndx[d] for d in dates})
@@ -132,7 +145,7 @@ def _num(v, d=2):
 
 records = []
 for d in dates:
-    n = ndx[d]; v = vix[d]; p = pe[d]
+    n = ndx[d]; v = vix_ff[d]; p = pe[d]
     m = ma200.get(d)
     m = None if (m is None or (isinstance(m, float) and math.isnan(m))) else float(m)
     dev = None if m is None else (n / m - 1.0) * 100.0
