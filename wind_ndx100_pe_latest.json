@@ -1,7 +1,7 @@
 {
   "date": "2026-08-19",
-  "pe": 30.9848,
-  "pe_pct": 49.542,
-  "source": "Wind get_index_fundamentals (NDX.GI 加权市盈率TTM，10年历史分位数)",
-  "note": "Wind EDB 无独立纳斯达克100 PE 日度序列，历史 PE 趋势采用纳斯达克综合PE(G0011659)作代理；最新一日 PE 与百分位用 NDX.GI 直接估值覆盖，以对齐参考版。"
+  "pe": 30.9436,
+  "pe_pct": 49.2234,
+  "source": "Wind get_index_fundamentals (NDX.GI)",
+  "note": "wind_cache 为综合PE代理，最新一日用 NDX.GI 直接估值覆盖"
 }
