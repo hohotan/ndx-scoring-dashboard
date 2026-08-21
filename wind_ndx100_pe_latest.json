@@ -1,7 +1,7 @@
 {
-  "date": "2026-08-19",
-  "pe": 30.9436,
-  "pe_pct": 49.2234,
+  "date": "2026-08-20",
+  "pe": 30.6362,
+  "pe_pct": 48.1688,
   "source": "Wind get_index_fundamentals (NDX.GI)",
   "note": "wind_cache 为综合PE代理，最新一日用 NDX.GI 直接估值覆盖"
 }
