@@ -1,17 +1,17 @@
 {
-  "generated_at": "2026-11-18T15:04:11.974875",
+  "generated_at": "2026-11-19T09:01:16.228016",
   "latest": {
-    "date": "2026-11-17",
-    "ndx": 27001.78,
+    "date": "2026-11-18",
+    "ndx": 27116.26,
     "pe": 25.49,
     "pe_pct": 14.9,
-    "ma200": 28053.88,
-    "dev_pct": -3.75,
+    "ma200": 28062.77,
+    "dev_pct": -3.37,
     "vix": 25.46,
     "pe_score": 25.5,
-    "ma_score": 7.5,
+    "ma_score": 6.7,
     "vix_score": 20.9,
-    "total": 53.9,
+    "total": 53.1,
     "grade": "C"
   },
   "source": "Wind: NDX.GI price, VIX.GI, EDB G0011659 PE proxy; latest PE/percentile = NDX.GI direct valuation"
